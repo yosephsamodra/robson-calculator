@@ -1,0 +1,149 @@
+<!— Embeddable Robson Calculator (flex-width). Drop inside any container. —>
+<!-- Tip: Control max width via the CSS custom property `--robson-max-width` on the wrapper. -->
+<div class="robson-widget" style="--robson-max-width:100%">
+  <style>
+    /* Scope ALL styles to the widget to avoid WordPress/theme clashes */
+    .robson-widget{font-family:Inter,system-ui,sans-serif; color:#063251}
+    .robson-widget *{box-sizing:border-box}
+
+    /* Layout: the card stretches to parent width; parent controls width */
+    .robson-card{background:#fff; border:1px solid #bae6fd; border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.08);
+      width:100%; max-width:var(--robson-max-width,100%); margin:0 auto; padding:16px;}
+
+    .robson-title{margin:0 0 12px; font-size:1.25rem; font-weight:800; color:#0ea5e9}
+    .robson-group{margin-bottom:12px}
+    .robson-legend{display:block; font-weight:700; margin-bottom:6px; color:#155e75}
+    .robson-select, .robson-number{width:100%; padding:10px 12px; border:1px solid #7dd3fc; border-radius:10px; font-size:1rem; background:#fff}
+
+    .robson-actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:8px}
+    .robson-btn{appearance:none; border:none; cursor:pointer; padding:10px 14px; border-radius:12px; font-weight:800; font-size:1rem}
+    .robson-btn--primary{background:linear-gradient(180deg,#6ee7b7,#10b981); color:#fff; box-shadow:0 4px 12px rgba(16,185,129,.25)}
+    .robson-btn--ghost{background:#fff; color:#063251; border:1px solid #bae6fd}
+
+    .robson-result{margin-top:14px; padding:14px; border:1px solid #bae6fd; border-radius:12px; background:#e0f2fe}
+    .robson-groupNumber{font-size:1.75rem; font-weight:900; color:#0ea5e9}
+    .robson-desc{margin-top:4px}
+
+    /* Responsive typography (optional) */
+    @media (min-width:720px){ .robson-title{font-size:1.35rem} }
+  </style>
+
+  <div class="robson-card" role="region" aria-labelledby="robson-title">
+    <h1 id="robson-title" class="robson-title">Kalkulator Robson</h1>
+
+    <form id="robson-form" class="robson-form">
+      <div class="robson-group">
+        <label class="robson-legend" for="robson-parity">Paritas</label>
+        <select id="robson-parity" class="robson-select">
+          <option value="primigravida">Primigravida</option>
+          <option value="multipara">Multipara</option>
+        </select>
+      </div>
+
+      <div class="robson-group">
+        <label class="robson-legend" for="robson-prevcs">Riwayat SC sebelumnya</label>
+        <select id="robson-prevcs" class="robson-select">
+          <option value="no">Tidak</option>
+          <option value="yes">Ya</option>
+        </select>
+      </div>
+
+      <div class="robson-group">
+        <label class="robson-legend" for="robson-plurality">Jumlah janin</label>
+        <select id="robson-plurality" class="robson-select">
+          <option value="tunggal">Tunggal</option>
+          <option value="ganda">Ganda</option>
+        </select>
+      </div>
+
+      <div class="robson-group">
+        <label class="robson-legend" for="robson-presentation">Presentasi janin</label>
+        <select id="robson-presentation" class="robson-select">
+          <option value="sefalik">Sefalik</option>
+          <option value="bokong">Bokong</option>
+          <option value="lintang">Lintang</option>
+        </select>
+      </div>
+
+      <div class="robson-group">
+        <label class="robson-legend" for="robson-ga">Usia kehamilan (minggu)</label>
+        <input type="number" id="robson-ga" class="robson-number" value="39" min="20" max="45" step="0.1" />
+      </div>
+
+      <div class="robson-group">
+        <label class="robson-legend" for="robson-onset">Awal persalinan</label>
+        <select id="robson-onset" class="robson-select">
+          <option value="spontan">Spontan</option>
+          <option value="induksi">Induksi</option>
+          <option value="prelabour_cs">SC sebelum persalinan</option>
+        </select>
+      </div>
+
+      <div class="robson-actions">
+        <button type="submit" class="robson-btn robson-btn--primary">Tentukan Kelompok</button>
+        <button type="button" class="robson-btn robson-btn--ghost" id="robson-reset">Reset</button>
+      </div>
+    </form>
+
+    <div id="robson-result" class="robson-result" hidden>
+      <div>Kelompok</div>
+      <div class="robson-groupNumber" id="robson-groupNumber">–</div>
+      <div class="robson-desc" id="robson-groupDesc"></div>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      const desc = {
+        1:'Primigravida, tunggal, sefalik, aterm, persalinan spontan.',
+        2:'Primigravida, tunggal, sefalik, aterm, induksi atau SC sebelum persalinan.',
+        3:'Multipara tanpa SC sebelumnya, tunggal, sefalik, aterm, persalinan spontan.',
+        4:'Multipara tanpa SC sebelumnya, tunggal, sefalik, aterm, induksi atau SC sebelum persalinan.',
+        5:'Multipara dengan ≥1 SC sebelumnya, tunggal, sefalik, aterm.',
+        6:'Primigravida, tunggal, presentasi bokong.',
+        7:'Multipara, tunggal, presentasi bokong.',
+        8:'Semua kehamilan ganda.',
+        9:'Semua letak janin lintang tunggal.',
+        10:'Tunggal, sefalik, prematur (<37 minggu).'
+      };
+
+      function classify(parity, prev_cs, plurality, presentation, ga, onset){
+        const aterm = parseFloat(ga) >= 37;
+        if (plurality==='ganda') return 8;
+        if (presentation==='lintang') return 9;
+        if (presentation==='bokong') return parity==='primigravida'?6:7;
+        if (presentation!=='sefalik') return null;
+        if (!aterm) return 10;
+        if (parity==='primigravida') return (onset==='spontan')?1:2;
+        if (prev_cs==='yes') return 5;
+        return (onset==='spontan')?3:4;
+      }
+
+      const $ = (id)=>document.getElementById(id);
+      const form = $('robson-form');
+      const resBox = $('robson-result');
+
+      form.addEventListener('submit', (e)=>{
+        e.preventDefault();
+        const group = classify(
+          $('robson-parity').value,
+          $('robson-prevcs').value,
+          $('robson-plurality').value,
+          $('robson-presentation').value,
+          $('robson-ga').value,
+          $('robson-onset').value
+        );
+        if (group){
+          $('robson-groupNumber').textContent = group;
+          $('robson-groupDesc').textContent = desc[group] || '';
+          resBox.hidden = false;
+        }
+      });
+
+      $('robson-reset').addEventListener('click', ()=>{
+        form.reset();
+        resBox.hidden = true;
+      });
+    })();
+  </script>
+</div>
